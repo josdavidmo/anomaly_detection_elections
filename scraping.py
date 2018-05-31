@@ -16,6 +16,8 @@ class Scraping:
         self.CONTENT_LENGTH_MUN = "135"
         self.CONTENT_LENGTH_ZONE = "147"
         self.CONTENT_LENGTH_PUEST = "157"
+        self.CONTENT_LENGTH_MES = "172"
+        self.ACTION_MES = 'cargar_mesas'
         self.ACTION_PUEST = 'cambiar_zona'
         self.ACTION_ZONE = 'cambiar_municipio'
         self.ACTION_MUN = 'cambiar_departamento'
@@ -92,5 +94,22 @@ class Scraping:
         soup = BeautifulSoup(zlib.decompress(
             page, 16 + zlib.MAX_WBITS), 'html.parser')
         soup = soup.find_all('option')
-        puest = [[option['value'], option.text] for option in soup if option['value'] != u'-1']
+        puest = [["%02d" % (int(option['value'])), option.text] for option in soup if option['value'] != u'-1']
         return puest
+
+    def get_mes(self, dept_id, mun_id, zone_id, puest_id):
+        mydata = [('accion', self.ACTION_MES),
+                  ('dep_activo', dept_id),
+                  ('mun_activo', mun_id),
+                  ('zona_activo', zone_id),
+                  ('pues_activo', puest_id),
+                  ('corp_activo', 'presidente'),
+                  ('token', self.TOKEN)]
+        mydata = urllib.urlencode(mydata)
+        page = self.__get_data__(mydata, self.CONTENT_LENGTH_MES)
+        soup = BeautifulSoup(zlib.decompress(
+            page, 16 + zlib.MAX_WBITS), 'html.parser')
+        soup = soup.find_all('tbody')[0]
+        links = soup.find_all(href=True)
+        mes = [link['href'] for link in links]
+        return mes
