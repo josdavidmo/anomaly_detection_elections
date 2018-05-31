@@ -10,8 +10,8 @@ class Scraping:
 
     def __init__(self):
         self.PATH = 'visor.e14digitalizacion.com'
-        self.COOKIE = '__cfduid=dea37c55781b85fe808ab9ddd963267751527728812; __cflb=1459906015; cf_clearance=65734bd144cd0785d48d5a255801a0a2b2b21cd7-1527728817-3600; SESSION=q2jc2cit672m7tmjg01ttsvrg5'
-        self.TOKEN = 'a53ba4a90df6f048c67eaf708a42b3bc3154b3285d280171a7d58000c0e11105'
+        self.COOKIE = '__cfduid=dea37c55781b85fe808ab9ddd963267751527728812; __cflb=1459906015; SESSION=q2jc2cit672m7tmjg01ttsvrg5; cf_clearance=537c380bd1752898e991a1edc3b48b71b244059f-1527781499-3600'
+        self.TOKEN = '9b6177aa28a9fa62303fff50f8965adda0d0987b7755cc7d68f2fb68547cea69'
         self.CONTENT_LENGTH_DEPT = "128"
         self.CONTENT_LENGTH_MUN = "135"
         self.CONTENT_LENGTH_ZONE = "147"
@@ -52,7 +52,7 @@ class Scraping:
         soup = BeautifulSoup(zlib.decompress(
             page, 16 + zlib.MAX_WBITS), 'html.parser')
         soup = soup.find_all('option')
-        dept = [["%02d" % (int(option['value'])), option.text] for option in soup]
+        dept = [["%02d" % (int(option['value'])), option.text.split('(')[0]] for option in soup]
         return dept
 
     def get_muns(self, dept_id):
@@ -94,7 +94,10 @@ class Scraping:
         soup = BeautifulSoup(zlib.decompress(
             page, 16 + zlib.MAX_WBITS), 'html.parser')
         soup = soup.find_all('option')
-        puest = [["%02d" % (int(option['value'])), option.text] for option in soup if option['value'] != u'-1']
+        try:
+            puest = [["%02d" % (int(option['value'])), option.text] for option in soup if option['value'] != u'-1']
+        except Exception as e:
+            puest = [[option['value'], option.text] for option in soup if option['value'] != u'-1']
         return puest
 
     def get_mes(self, dept_id, mun_id, zone_id, puest_id):
@@ -111,5 +114,5 @@ class Scraping:
             page, 16 + zlib.MAX_WBITS), 'html.parser')
         soup = soup.find_all('tbody')[0]
         links = soup.find_all(href=True)
-        mes = [link['href'] for link in links]
+        mes = [[link.text, link['href']] for link in links]
         return mes
