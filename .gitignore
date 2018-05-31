@@ -1,3 +1,7 @@
+# Ignore Virtual Env
+anomaly_detection_elections_env/
+anomaly_detection_elections_env/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
