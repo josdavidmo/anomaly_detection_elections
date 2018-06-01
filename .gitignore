@@ -1,3 +1,7 @@
+# Ignore Train Data
+train_data/
+train_data/*
+
 # Ignore Virtual Env
 anomaly_detection_elections_env/
 anomaly_detection_elections_env/*

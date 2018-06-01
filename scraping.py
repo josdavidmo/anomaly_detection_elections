@@ -32,9 +32,11 @@ class Scraping:
         req.add_header("scheme", "https")
         req.add_header("accept", "*/*")
         req.add_header("accept-encoding", "gzip, deflate, br")
-        req.add_header("accept-language", "es-CO,es;q=0.9,de-DE;q=0.8,de;q=0.7,en-US;q=0.6,en;q=0.5")
+        req.add_header(
+            "accept-language", "es-CO,es;q=0.9,de-DE;q=0.8,de;q=0.7,en-US;q=0.6,en;q=0.5")
         req.add_header("content-length", content_length)
-        req.add_header("content-type", "application/x-www-form-urlencoded; charset=UTF-8")
+        req.add_header(
+            "content-type", "application/x-www-form-urlencoded; charset=UTF-8")
         req.add_header("cookie", self.COOKIE)
         req.add_header("origin", "https://%s" % (self.PATH))
         req.add_header("referer", "https://%s/" % (self.PATH))
@@ -52,7 +54,8 @@ class Scraping:
         soup = BeautifulSoup(zlib.decompress(
             page, 16 + zlib.MAX_WBITS), 'html.parser')
         soup = soup.find_all('option')
-        dept = [["%02d" % (int(option['value'])), option.text.split('(')[0]] for option in soup]
+        dept = [["%02d" % (int(option['value'])), option.text.split(
+            '(')[0]] for option in soup]
         return dept
 
     def get_muns(self, dept_id):
@@ -65,7 +68,8 @@ class Scraping:
         soup = BeautifulSoup(zlib.decompress(
             page, 16 + zlib.MAX_WBITS), 'html.parser')
         soup = soup.find_all('option')
-        mun = [["%03d" % (int(option['value'])), option.text] for option in soup]
+        mun = [["%03d" % (int(option['value'])), option.text]
+               for option in soup]
         return mun
 
     def get_zones(self, dept_id, mun_id):
@@ -79,7 +83,8 @@ class Scraping:
         soup = BeautifulSoup(zlib.decompress(
             page, 16 + zlib.MAX_WBITS), 'html.parser')
         soup = soup.find_all('option')
-        zones = [["%02d" % (int(option['value'])), option.text] for option in soup if option['value'] != u'-1']
+        zones = [["%02d" % (int(option['value'])), option.text]
+                 for option in soup if option['value'] != u'-1']
         return zones
 
     def get_puest(self, dept_id, mun_id, zone_id):
@@ -95,9 +100,11 @@ class Scraping:
             page, 16 + zlib.MAX_WBITS), 'html.parser')
         soup = soup.find_all('option')
         try:
-            puest = [["%02d" % (int(option['value'])), option.text] for option in soup if option['value'] != u'-1']
+            puest = [["%02d" % (int(option['value'])), option.text]
+                     for option in soup if option['value'] != u'-1']
         except Exception as e:
-            puest = [[option['value'], option.text] for option in soup if option['value'] != u'-1']
+            puest = [[option['value'], option.text]
+                     for option in soup if option['value'] != u'-1']
         return puest
 
     def get_mes(self, dept_id, mun_id, zone_id, puest_id):
