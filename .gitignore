@@ -1,6 +1,10 @@
+# Ignore Forms
+forms/
+forms/*
+
 # Ignore Train Data
-train_data/
-train_data/*
+test_data/
+test_data/*
 
 # Ignore Virtual Env
 anomaly_detection_elections_env/
