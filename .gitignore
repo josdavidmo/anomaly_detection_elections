@@ -1,6 +1,6 @@
 # Ignore Forms
-forms/
-forms/*
+data/
+data/*
 
 # Ignore Train Data
 test_data/
