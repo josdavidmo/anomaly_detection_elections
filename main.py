@@ -1,6 +1,9 @@
 from pdf2image import convert_from_path
 from utils.algorithms import pyramid
 from utils.algorithms import sliding_window
+from utils.tensorflow import load_graph
+from utils.tensorflow import read_tensor_from_image
+from utils.tensorflow import load_labels
 import argparse
 import imutils
 import time
@@ -12,43 +15,16 @@ CHARACTER_DETECTION = 'models/character_detection.pb'
 CHARACTER_CLASSIFICATION = 'models/character_classification.pb'
 CHARACTER_SEGMENTATION = 'models/character_segmentation.pb'
 
+LABEL_CHARACTER_DETECTION = "models/character_detection_labels.txt"
+LABEL_CHARACTER_CLASSIFICATION = "models/character_classification_labels.txt"
+LABEL_CHARACTER_SEGMENTATION = "models/character_segmentation_labels.txt"
+
 INPUT_HEIGHT = 224
 INPUT_WIDTH = 224
 INPUT_MEAN = 128
 INPUT_STD = 128
 INPUT_LAYER = "input"
 OUTPUT_LAYER = "final_result"
-
-
-def load_graph(model_file):
-    graph = tf.Graph()
-    graph_def = tf.GraphDef()
-
-    with open(model_file, "rb") as f:
-        graph_def.ParseFromString(f.read())
-    with graph.as_default():
-        tf.import_graph_def(graph_def)
-
-
-def read_tensor_from_image(window, input_height=299, input_width=299,
-                           input_mean=0, input_std=255):
-    float_caster = tf.cast(window, tf.float32)
-    dims_expander = tf.expand_dims(float_caster, 0)
-    resized = tf.image.resize_bilinear(
-        dims_expander, [input_height, input_width])
-    normalized = tf.divide(tf.subtract(resized, [input_mean]), [input_std])
-    sess = tf.Session()
-    result = sess.run(normalized)
-    return result
-
-
-def load_labels(label_file):
-    label = []
-    proto_as_ascii_lines = tf.gfile.GFile(label_file).readlines()
-    for l in proto_as_ascii_lines:
-        label.append(l.rstrip())
-    return label
-
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
@@ -81,12 +57,11 @@ if __name__ == "__main__":
                                        input_width=INPUT_WIDTH,
                                        input_mean=INPUT_MEAN,
                                        input_std=INPUT_STD)
-            """
+
             input_name = "import/" + INPUT_LAYER
             output_name = "import/" + OUTPUT_LAYER
             input_operation = graph.get_operation_by_name(input_name)
             output_operation = graph.get_operation_by_name(output_name)
-
 
             with tf.Session(graph=graph) as sess:
               start = time.time()
@@ -96,16 +71,16 @@ if __name__ == "__main__":
             results = np.squeeze(results)
 
             top_k = results.argsort()[-5:][::-1]
-            labels = load_labels(label_file)
+            labels = load_labels(LABEL_CHARACTER_DETECTION)
 
             print('\nEvaluation time (1-image): {:.3f}s\n'.format(end-start))
             template = "{} (score={:0.5f})"
             for i in top_k:
               print(template.format(labels[i], results[i]))
-            """
+
             # since we do not have a classifier, we'll just draw the window
             clone = resized.copy()
             cv2.rectangle(clone, (x, y), (x + winW, y + winH), (0, 255, 0), 2)
             cv2.imshow("Window", clone)
             cv2.waitKey(1)
-            time.sleep(0.025)
+            #time.sleep(0.025)
