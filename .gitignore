@@ -1,4 +1,5 @@
 # Ignore Forms
+data.tar.xz
 data/
 data/*
 
