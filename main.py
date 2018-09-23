@@ -64,23 +64,20 @@ if __name__ == "__main__":
             output_operation = graph.get_operation_by_name(output_name)
 
             with tf.Session(graph=graph) as sess:
-              start = time.time()
+              #start = time.time()
               results = sess.run(output_operation.outputs[0],
                                 {input_operation.outputs[0]: t})
-              end=time.time()
+              #end=time.time()
             results = np.squeeze(results)
 
             top_k = results.argsort()[-5:][::-1]
             labels = load_labels(LABEL_CHARACTER_DETECTION)
 
-            print('\nEvaluation time (1-image): {:.3f}s\n'.format(end-start))
-            template = "{} (score={:0.5f})"
-            for i in top_k:
-              print(template.format(labels[i], results[i]))
+            #print('\nEvaluation time (1-image): {:.3f}s\n'.format(end-start))
 
-            # since we do not have a classifier, we'll just draw the window
-            clone = resized.copy()
-            cv2.rectangle(clone, (x, y), (x + winW, y + winH), (0, 255, 0), 2)
-            cv2.imshow("Window", clone)
+            if labels[top_k[0]] == 'nan':
+                cv2.rectangle(resized, (x, y), (x + winW, y + winH), (255, 255, 255), cv2.FILLED)
+
+            cv2.imshow("Window", resized)
             cv2.waitKey(1)
             #time.sleep(0.025)
