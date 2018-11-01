@@ -27,6 +27,44 @@ INPUT_STD = 128
 INPUT_LAYER = "input"
 OUTPUT_LAYER = "final_result"
 
+
+def image_recognition(args):
+    resized, window, x, y = args
+    # THIS IS WHERE YOU WOULD PROCESS YOUR WINDOW, SUCH AS APPLYING A
+    # MACHINE LEARNING CLASSIFIER TO CLASSIFY THE CONTENTS OF THE
+    # WINDOW
+    t = read_tensor_from_image(window,
+                               input_height=INPUT_HEIGHT,
+                               input_width=INPUT_WIDTH,
+                               input_mean=INPUT_MEAN,
+                               input_std=INPUT_STD)
+
+    input_name = "import/" + INPUT_LAYER
+    output_name = "import/" + OUTPUT_LAYER
+    input_operation = graph.get_operation_by_name(input_name)
+    output_operation = graph.get_operation_by_name(output_name)
+
+    with tf.Session(graph=graph) as sess:
+        #start = time.time()
+        results = sess.run(output_operation.outputs[0],
+                           {input_operation.outputs[0]: t})
+        # end=time.time()
+    results = np.squeeze(results)
+
+    top_k = results.argsort()[-5:][::-1]
+    labels = load_labels(LABEL_CHARACTER_DETECTION)
+
+    #print('\nEvaluation time (1-image): {:.3f}s\n'.format(end-start))
+
+    if labels[top_k[0]] == 'nan':
+        cv2.rectangle(resized, (x, y), (x + winW, y + winH),
+                      (255, 255, 255), cv2.FILLED)
+
+    cv2.imshow("Window", resized)
+    cv2.waitKey(1)
+    # time.sleep(0.025)
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("-i", "--image", required=True, help="Path to the image")
@@ -52,42 +90,7 @@ if __name__ == "__main__":
             # if the window does not meet our desired window size, ignore it
             if window.shape[0] != winH or window.shape[1] != winW:
                 continue
-            ghetto_queue.append((window))
+            ghetto_queue.append((resized, window, x, y))
 
-    pool = multiprocessing.Pool(2)
+    pool = multiprocessing.Pool(4)
     successful_tasks = pool.map(image_recognition, ghetto_queue)
-
-def image_recognition(args):
-    window = args
-    # THIS IS WHERE YOU WOULD PROCESS YOUR WINDOW, SUCH AS APPLYING A
-    # MACHINE LEARNING CLASSIFIER TO CLASSIFY THE CONTENTS OF THE
-    # WINDOW
-    t = read_tensor_from_image(window,
-                               input_height=INPUT_HEIGHT,
-                               input_width=INPUT_WIDTH,
-                               input_mean=INPUT_MEAN,
-                               input_std=INPUT_STD)
-
-    input_name = "import/" + INPUT_LAYER
-    output_name = "import/" + OUTPUT_LAYER
-    input_operation = graph.get_operation_by_name(input_name)
-    output_operation = graph.get_operation_by_name(output_name)
-
-    with tf.Session(graph=graph) as sess:
-      #start = time.time()
-      results = sess.run(output_operation.outputs[0],
-                        {input_operation.outputs[0]: t})
-      #end=time.time()
-    results = np.squeeze(results)
-
-    top_k = results.argsort()[-5:][::-1]
-    labels = load_labels(LABEL_CHARACTER_DETECTION)
-
-    #print('\nEvaluation time (1-image): {:.3f}s\n'.format(end-start))
-
-    if labels[top_k[0]] == 'nan':
-        cv2.rectangle(resized, (x, y), (x + winW, y + winH), (255, 255, 255), cv2.FILLED)
-
-    cv2.imshow("Window", resized)
-    cv2.waitKey(1)
-    #time.sleep(0.025)
