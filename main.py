@@ -29,7 +29,7 @@ OUTPUT_LAYER = "final_result"
 
 
 def image_recognition(args):
-    window, x, y = args
+    window, x, y, w, h = args
     # THIS IS WHERE YOU WOULD PROCESS YOUR WINDOW, SUCH AS APPLYING A
     # MACHINE LEARNING CLASSIFIER TO CLASSIFY THE CONTENTS OF THE
     # WINDOW
@@ -53,7 +53,7 @@ def image_recognition(args):
     labels = load_labels(LABEL_CHARACTER_DETECTION)
 
     if labels[top_k[0]] == 'an':
-        return (x, y)
+        return (x * w, y * h)
     return None
 
 
@@ -76,14 +76,14 @@ if __name__ == "__main__":
     graph = load_graph(CHARACTER_DETECTION)
 
     # loop over the image pyramid
-    for resized in pyramid(image, scale=1.5):
+    for (resized, w, h) in pyramid(image, scale=1.5):
         # loop over the sliding window for each layer of the pyramid
-        for (x, y, window) in sliding_window(resized, stepSize=32, windowSize=(winW, winH)):
+        for (x, y, window) in sliding_window(resized, stepSizeX=17, stepSizeY=19, windowSize=(winW, winH)):
 
             # if the window does not meet our desired window size, ignore it
             if window.shape[0] != winH or window.shape[1] != winW:
                 continue
-            ghetto_queue.append((window, x, y))
+            ghetto_queue.append((window, x, y, w, h))
 
     pool = multiprocessing.Pool(int(args["workers"]))
     tasks = pool.map(image_recognition, ghetto_queue)
@@ -94,3 +94,4 @@ if __name__ == "__main__":
     cv2.imshow("Window", image)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+    cv2.imwrite("result.png", image)
