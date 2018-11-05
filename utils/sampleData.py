@@ -1,13 +1,15 @@
-from pdf2image import convert_from_path
-from multiprocessing import Pool
-import os
 import argparse
+import os
 import time
-import cv2
-import numpy
-import imutils
-import MySQLdb
 import uuid
+from multiprocessing import Pool
+
+import cv2
+import imutils
+import numpy
+from pdf2image import convert_from_path
+
+import MySQLdb
 
 HOST = 'localhost'
 USER = 'root'

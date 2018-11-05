@@ -1,6 +1,7 @@
-from multiprocessing import Pool
-import urllib2
 import os
+import urllib2
+from multiprocessing import Pool
+
 import MySQLdb
 
 HOST = 'localhost'

@@ -1,9 +1,10 @@
-from multiprocessing import Pool
 import itertools as it
 import os
+import uuid
+from multiprocessing import Pool
+
 import cv2
 import numpy as np
-import uuid
 
 DIRECTORY = 'train_data'
 

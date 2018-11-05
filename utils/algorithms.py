@@ -1,31 +1,38 @@
 from __future__ import absolute_import
 
+import multiprocessing
+
 import cv2
 import imutils
-import multiprocessing
 import numpy as np
 import tensorflow as tf
-from utils.tensorflow import load_graph
-from utils.tensorflow import load_labels
-from utils.tensorflow import read_tensor_from_image
+
+from utils.tensorflow import load_graph, load_labels, read_tensor_from_image
 
 INPUT_HEIGHT = 224
 INPUT_WIDTH = 224
 INPUT_MEAN = 128
 INPUT_STD = 128
-WIN_W=34
-WIN_H=39
-STEP_SIZE_X=17
-STEP_SIZE_Y=19
-SCALE=1.5
+WIN_W = 34
+WIN_H = 39
+STEP_SIZE_X = 17
+STEP_SIZE_Y = 19
+SCALE = 1.5
 THRESHOLD = .8
 INPUT_LAYER = "input"
 OUTPUT_LAYER = "final_result"
 TITLE_PATH = 'utils/0b0854bc-24b2-4a4a-8371-ae3aa1ab358a.png'
 CUBIC_PATH = 'utils/1b318ef1-bdbd-47b0-8bef-c274b7f89b5b.png'
 
+ROWS = 12
+COLUMNS = 3
+MARGIN_X = 25
+MARGIN_Y = 45
+PADDING = 6
+
 
 def get_zone_region(image):
+    from operator import itemgetter
     title = cv2.imread(TITLE_PATH)
     cubic = cv2.imread(CUBIC_PATH)
     w_title, h_title = title.shape[:-1]
@@ -35,8 +42,21 @@ def get_zone_region(image):
     res_cubic = cv2.matchTemplate(image, cubic, cv2.TM_CCOEFF_NORMED)
 
     loc_title = next(zip(*np.where(res_title >= THRESHOLD)[::-1]))
-    loc_cubic = max(zip(*np.where(res_cubic >= THRESHOLD)[::-1]))
-    return image[loc_title[1] + h_title:loc_cubic[1],loc_title[0]:loc_cubic[0] + w_cubic,:]
+    loc_cubic_x = max(zip(*np.where(res_cubic >= THRESHOLD)
+                          [::-1]), key=itemgetter(1))[1]
+    loc_cubic_y = max(zip(*np.where(res_cubic >= THRESHOLD)
+                          [::-1]), key=itemgetter(0))[0]
+    return image[loc_title[1] + h_title:loc_cubic_x, loc_title[0]:loc_cubic_y + w_cubic, :]
+
+
+def get_cells(votation_region):
+    step_size_x = int(votation_region.shape[1] / COLUMNS)
+    step_size_y = int(votation_region.shape[0] / ROWS)
+    for y in range(MARGIN_Y, votation_region.shape[0], step_size_y):
+        for x in range(MARGIN_X, votation_region.shape[1], step_size_x):
+            yield (votation_region[y - PADDING:y + step_size_y + PADDING,
+                                   x - PADDING:x + step_size_x + PADDING])
+
 
 def pyramid(image, scale=SCALE, minSize=(30, 30)):
     # yield the original image
@@ -114,7 +134,7 @@ def computational_vision(image, model, match, workers, win_w=WIN_W, win_h=WIN_H,
             if window.shape[0] != win_h or window.shape[1] != win_w:
                 continue
             ghetto_queue.append((window, x, y, w, h, model["model"],
-                    model["labels"], match))
+                                 model["labels"], match))
 
     pool = multiprocessing.Pool(workers)
     tasks = pool.map(image_recognition, ghetto_queue)

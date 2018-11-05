@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-import urllib2
 import urllib
+import urllib2
 import zlib
+
 from bs4 import BeautifulSoup
 
 
