@@ -3,6 +3,7 @@ from utils.algorithms import computational_vision
 from utils.algorithms import WIN_W,WIN_H
 from utils.algorithms import get_zone_region
 import argparse
+import cv2
 import imutils
 import numpy as np
 import time
@@ -44,16 +45,16 @@ if __name__ == "__main__":
 
     scale = 10
     w = int(image.shape[1] / scale)
-    image = imutils.resize(image, width=w)
+    image = imutils.resize(votation_region, width=w)
 
 
-    # region_detection_array = computational_vision(image, MODELS["region_detection"],
-    #             ('cubic','title'), workers)
-    #
-    # for (x, y) in region_detection_array:
-    #     cv2.rectangle(image, (x, y), (x + WIN_W, y + WIN_H), (0, 255, 0), 2)
-    # cv2.namedWindow("Window", cv2.WINDOW_AUTOSIZE)
-    # cv2.imshow("Window", image)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
-    # cv2.imwrite("result.png", image)
+    character_detection_array = computational_vision(image, MODELS["character_detection"],
+                ('an'), workers)
+
+    for (x, y) in character_detection_array:
+        cv2.rectangle(image, (x, y), (x + WIN_W, y + WIN_H), (0, 255, 0), 2)
+    cv2.namedWindow("Window", cv2.WINDOW_AUTOSIZE)
+    cv2.imshow("Window", image)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    cv2.imwrite("result.png", image)
