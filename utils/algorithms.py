@@ -21,8 +21,8 @@ SCALE=1.5
 THRESHOLD = .8
 INPUT_LAYER = "input"
 OUTPUT_LAYER = "final_result"
-TITLE_PATH = '/home/josdavidmo/Projects/anomaly_detection_elections/utils/0b0854bc-24b2-4a4a-8371-ae3aa1ab358a.png'
-CUBIC_PATH = '/home/josdavidmo/Projects/anomaly_detection_elections/utils/1b318ef1-bdbd-47b0-8bef-c274b7f89b5b.png'
+TITLE_PATH = 'utils/0b0854bc-24b2-4a4a-8371-ae3aa1ab358a.png'
+CUBIC_PATH = 'utils/1b318ef1-bdbd-47b0-8bef-c274b7f89b5b.png'
 
 
 def get_zone_region(image):

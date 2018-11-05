@@ -31,7 +31,7 @@ MODELS = {
 
 
 if __name__ == "__main__":
-    workers = multiprocessing.cpu_count() * 2 + 1
+    workers = multiprocessing.cpu_count() + 1
     ap = argparse.ArgumentParser()
     ap.add_argument("-i", "--image", required=True, help="Path to the image")
     ap.add_argument("-w", "--workers",
