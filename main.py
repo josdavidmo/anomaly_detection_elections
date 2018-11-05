@@ -1,13 +1,13 @@
 from pdf2image import convert_from_path
 from utils.algorithms import computational_vision
-from utils.algorithms import WIN_W,WIN_H
+from utils.algorithms import WIN_W, WIN_H
 from utils.algorithms import get_zone_region
 import argparse
 import cv2
 import imutils
 import numpy as np
 import time
-import pprint
+import multiprocessing
 
 
 MODELS = {
@@ -30,11 +30,12 @@ MODELS = {
 }
 
 
-
 if __name__ == "__main__":
+    workers = multiprocessing.cpu_count() * 2 + 1
     ap = argparse.ArgumentParser()
     ap.add_argument("-i", "--image", required=True, help="Path to the image")
-    ap.add_argument("-w", "--workers", required=True, help="Workers")
+    ap.add_argument("-w", "--workers",
+                    default=workers, help="Number of workers")
 
     args = vars(ap.parse_args())
     workers = int(args["workers"])
@@ -47,9 +48,8 @@ if __name__ == "__main__":
     w = int(image.shape[1] / scale)
     image = imutils.resize(votation_region, width=w)
 
-
     character_detection_array = computational_vision(image, MODELS["character_detection"],
-                ('an'), workers)
+                                                     ('an'), workers)
 
     for (x, y) in character_detection_array:
         cv2.rectangle(image, (x, y), (x + WIN_W, y + WIN_H), (0, 255, 0), 2)
