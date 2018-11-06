@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import multiprocessing
+from operator import itemgetter
 
 import cv2
 import imutils
@@ -15,15 +16,16 @@ INPUT_MEAN = 128
 INPUT_STD = 128
 WIN_W = 34
 WIN_H = 39
-STEP_SIZE_X = 17
-STEP_SIZE_Y = 19
-SCALE = 1.5
+STEP_SIZE_X = 25
+STEP_SIZE_Y = 28
+SCALE = 5
 THRESHOLD = .8
 INPUT_LAYER = "input"
 OUTPUT_LAYER = "final_result"
 TITLE_PATH = 'utils/0b0854bc-24b2-4a4a-8371-ae3aa1ab358a.png'
 CUBIC_PATH = 'utils/1b318ef1-bdbd-47b0-8bef-c274b7f89b5b.png'
-
+PATH_MODEL = "models/character_classification.pb"
+PATH_LABELS = "models/character_classification_labels.txt"
 ROWS = 12
 COLUMNS = 3
 MARGIN_X = 25
@@ -32,21 +34,30 @@ PADDING = 6
 
 
 def get_zone_region(image):
-    from operator import itemgetter
+    w_image = int(image.shape[1] / SCALE)
+    h_image = int(image.shape[0] / SCALE)
+    image_copy = imutils.resize(image, width=w_image, height=h_image)
+
     title = cv2.imread(TITLE_PATH)
+    w = int(title.shape[1] / SCALE)
+    title = imutils.resize(title, width=w)
+
     cubic = cv2.imread(CUBIC_PATH)
+    w = int(cubic.shape[1] / SCALE)
+    cubic = imutils.resize(cubic, width=w)
+
     w_title, h_title = title.shape[:-1]
     w_cubic, h_cubic = cubic.shape[:-1]
 
-    res_title = cv2.matchTemplate(image, title, cv2.TM_CCOEFF_NORMED)
-    res_cubic = cv2.matchTemplate(image, cubic, cv2.TM_CCOEFF_NORMED)
-
+    res_title = cv2.matchTemplate(image_copy, title, cv2.TM_CCOEFF_NORMED)
+    res_cubic = cv2.matchTemplate(image_copy, cubic, cv2.TM_CCOEFF_NORMED)
     loc_title = next(zip(*np.where(res_title >= THRESHOLD)[::-1]))
-    loc_cubic_x = max(zip(*np.where(res_cubic >= THRESHOLD)
-                          [::-1]), key=itemgetter(1))[1]
     loc_cubic_y = max(zip(*np.where(res_cubic >= THRESHOLD)
+                          [::-1]), key=itemgetter(1))[1]
+    loc_cubic_x = max(zip(*np.where(res_cubic >= THRESHOLD)
                           [::-1]), key=itemgetter(0))[0]
-    return image[loc_title[1] + h_title:loc_cubic_x, loc_title[0]:loc_cubic_y + w_cubic, :]
+    return image[(loc_title[1] + h_title)*SCALE:loc_cubic_y*SCALE,
+                  loc_title[0]*SCALE:(loc_cubic_x + w_cubic)*SCALE, :]
 
 
 def get_cells(votation_region):
@@ -58,44 +69,10 @@ def get_cells(votation_region):
                                    x - PADDING:x + step_size_x + PADDING])
 
 
-def pyramid(image, scale=SCALE, minSize=(30, 30)):
-    # yield the original image
-    yield (image, 1, 1)
-
-    # keep looping over the pyramid
-    while True:
-        # compute the new dimensions of the image and resize it
-        h = int(image.shape[0] / scale)
-        w = int(image.shape[1] / scale)
-        image = imutils.resize(image, width=w, height=h)
-
-        # if the resized image does not meet the supplied minimum
-        # size, then stop constructing the pyramid
-        if image.shape[0] < minSize[1] or image.shape[1] < minSize[0]:
-            break
-
-        # yield the next image in the pyramid
-        yield (image, w, h)
-
-
-def sliding_window(image, stepSizeX, stepSizeY, windowSize):
-        # slide a window across the image
-    for y in range(0, image.shape[0], stepSizeY):
-        for x in range(0, image.shape[1], stepSizeX):
-            # yield the current window
-            yield (x, y, image[y:y + windowSize[1], x:x + windowSize[0]])
-
-
-def image_recognition(args):
-    window, x, y, w, h, path_graph, path_labels, match = args
-    # THIS IS WHERE YOU WOULD PROCESS YOUR WINDOW, SUCH AS APPLYING A
-    # MACHINE LEARNING CLASSIFIER TO CLASSIFY THE CONTENTS OF THE
-    # WINDOW
-
-    # load model
-    graph = load_graph(path_graph)
-    labels = load_labels(path_labels)
-
+def computational_vision(image, win_w=WIN_W, win_h=WIN_H):
+    graph = load_graph(PATH_MODEL)
+    labels = load_labels(PATH_LABELS)
+    window = imutils.resize(image, width=WIN_W, height=WIN_H)
     t = read_tensor_from_image(window,
                                input_height=INPUT_HEIGHT,
                                input_width=INPUT_WIDTH,
@@ -111,31 +88,5 @@ def image_recognition(args):
         results = sess.run(output_operation.outputs[0],
                            {input_operation.outputs[0]: t})
     results = np.squeeze(results)
-
-    top_k = results.argsort()[-5:][::-1]
-
-    if labels[top_k[0]] in match:
-        print (x * w, y * h)
-        return (x * w, y * h)
-    return None
-
-
-def computational_vision(image, model, match, workers, win_w=WIN_W, win_h=WIN_H,
-                         step_size_x=STEP_SIZE_X, step_size_y=STEP_SIZE_Y, scale=SCALE):
-    ghetto_queue = []
-
-    # loop over the image pyramid
-    for (resized, w, h) in pyramid(image, scale):
-        # loop over the sliding window for each layer of the pyramid
-        for (x, y, window) in sliding_window(resized, step_size_x, step_size_y,
-                                             windowSize=(win_w, win_h)):
-
-            # if the window does not meet our desired window size, ignore it
-            if window.shape[0] != win_h or window.shape[1] != win_w:
-                continue
-            ghetto_queue.append((window, x, y, w, h, model["model"],
-                                 model["labels"], match))
-
-    pool = multiprocessing.Pool(workers)
-    tasks = pool.map(image_recognition, ghetto_queue)
-    return filter(None, tasks)
+    top_k = results.argsort()[-1:][::-1]
+    return labels[top_k[0]]

@@ -10,7 +10,7 @@ import verboselogs
 from pdf2image import convert_from_path
 
 from utils.algorithms import (COLUMNS, MARGIN_X, MARGIN_Y, PADDING, ROWS,
-                              get_cells, get_zone_region)
+                              computational_vision, get_cells, get_zone_region)
 
 MODELS = {
     "region_detection": {
@@ -35,7 +35,7 @@ logger = verboselogs.VerboseLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 
 if __name__ == "__main__":
-    workers = multiprocessing.cpu_count() * 2 + 1
+    workers = multiprocessing.cpu_count() + 1
     ap = argparse.ArgumentParser()
     ap.add_argument("-i", "--image", required=True, help="Path to the image")
     ap.add_argument("-w", "--workers",
@@ -66,7 +66,6 @@ if __name__ == "__main__":
     logger.debug("Evaluation time (1-image): {:.3f}s".format(end - start))
     if verbosity > 2:
         cv2.imshow("Window", image)
-        time.sleep(1)
         cv2.waitKey(0)
         cv2.imwrite("results/vote.png", image)
 
@@ -77,16 +76,10 @@ if __name__ == "__main__":
     logger.debug("Evaluation time (1-image): {:.3f}s".format(end - start))
     if verbosity > 2:
         cv2.imshow("Window", vote_region)
-        time.sleep(1)
         cv2.waitKey(0)
         cv2.imwrite("results/vote_region.png", vote_region)
 
     logger.info("Segmenting Zone Region")
-    start = time.time()
-    cells = [cell for (cell) in get_cells(vote_region)]
-    end = time.time()
-    logger.debug("Total segments: {}".format(len(cells)))
-    logger.debug("Evaluation time (1-image): {:.3f}s".format(end - start))
     if verbosity > 2:
         clone = vote_region.copy()
         step_size_x = int(clone.shape[1] / COLUMNS)
@@ -100,6 +93,16 @@ if __name__ == "__main__":
                               (0, 255, 0),
                               2)
         cv2.imshow("Window", clone)
-        time.sleep(1)
         cv2.waitKey(0)
         cv2.imwrite("results/vote_region_segmented.png", clone)
+
+    logger.info("Character Classification")
+    for (cell) in get_cells(vote_region):
+        start = time.time()
+        result = computational_vision(cell)
+        end = time.time()
+        logger.info("Result: {}".format(result))
+        logger.debug("Evaluation time (1-image): {:.3f}s".format(end - start))
+        if verbosity > 2:
+            cv2.imshow("Result: {}".format(result), cell)
+            cv2.waitKey(0)

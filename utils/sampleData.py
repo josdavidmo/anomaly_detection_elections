@@ -40,7 +40,7 @@ def create_train_data(args):
         # convert the image and scale it
         image = convert_from_path(file)[0].convert('RGB')
         image = numpy.array(image)
-        scale = 5
+        scale = 7
         w = int(image.shape[1] / scale)
         image = imutils.resize(image, width=w)
         # define the window width and height
