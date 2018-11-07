@@ -24,13 +24,42 @@ INPUT_LAYER = "input"
 OUTPUT_LAYER = "final_result"
 TITLE_PATH = 'utils/0b0854bc-24b2-4a4a-8371-ae3aa1ab358a.png'
 CUBIC_PATH = 'utils/1b318ef1-bdbd-47b0-8bef-c274b7f89b5b.png'
+CORNERS_PATH = 'utils/corners.png'
 PATH_MODEL = "models/character_classification.pb"
 PATH_LABELS = "models/character_classification_labels.txt"
-ROWS = 12
+ROWS_CANDIDATES = 8
+ROWS_TOTALS = 4
 COLUMNS = 3
 MARGIN_X = 25
 MARGIN_Y = 45
 PADDING = 6
+
+
+def get_crop_coordinates(vote_region):
+    corners = cv2.imread(CORNERS_PATH)
+    w_corners, h_corners = corners.shape[:-1]
+    res_corners = cv2.matchTemplate(vote_region, corners, cv2.TM_CCOEFF_NORMED)
+    loc_corners = next(zip(*np.where(res_corners >= THRESHOLD)[::-1]))
+    (loc_corners_x, loc_corners_y) = (int(loc_corners[0] +
+                                          w_corners / 2), int(loc_corners[1] + h_corners / 2))
+
+    points = []
+
+    step_size_x = int(vote_region.shape[1] / COLUMNS)
+    step_size_y = int(loc_corners_y / ROWS_CANDIDATES)
+
+    for y in range(MARGIN_Y, loc_corners_y, step_size_y):
+        for x in range(MARGIN_X, vote_region.shape[1], step_size_x):
+            points.append((x, y, step_size_x, step_size_y))
+
+    step_size_y = int(
+        (vote_region.shape[0] - MARGIN_Y - loc_corners_y) / ROWS_TOTALS)
+
+    for y in range(loc_corners_y + MARGIN_Y, vote_region.shape[0], step_size_y):
+        for x in range(MARGIN_X, vote_region.shape[1], step_size_x):
+            points.append((x, y, step_size_x, step_size_y))
+
+    return points
 
 
 def get_zone_region(image):
@@ -56,17 +85,14 @@ def get_zone_region(image):
                           [::-1]), key=itemgetter(1))[1]
     loc_cubic_x = max(zip(*np.where(res_cubic >= THRESHOLD)
                           [::-1]), key=itemgetter(0))[0]
-    return image[(loc_title[1] + h_title)*SCALE:loc_cubic_y*SCALE,
-                  loc_title[0]*SCALE:(loc_cubic_x + w_cubic)*SCALE, :]
+    return image[(loc_title[1] + h_title) * SCALE:(loc_cubic_y - 8) * SCALE,
+                 loc_title[0] * SCALE:(loc_cubic_x + w_cubic) * SCALE, :]
 
 
-def get_cells(votation_region):
-    step_size_x = int(votation_region.shape[1] / COLUMNS)
-    step_size_y = int(votation_region.shape[0] / ROWS)
-    for y in range(MARGIN_Y, votation_region.shape[0], step_size_y):
-        for x in range(MARGIN_X, votation_region.shape[1], step_size_x):
-            yield (votation_region[y - PADDING:y + step_size_y + PADDING,
-                                   x - PADDING:x + step_size_x + PADDING])
+def get_cells(votation_region, points):
+    for (x, y, step_size_x, step_size_y) in points:
+        yield (votation_region[y:y + step_size_y,
+                               x:x + step_size_x])
 
 
 def computational_vision(image, win_w=WIN_W, win_h=WIN_H):

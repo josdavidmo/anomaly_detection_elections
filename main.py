@@ -9,8 +9,9 @@ import numpy as np
 import verboselogs
 from pdf2image import convert_from_path
 
-from utils.algorithms import (COLUMNS, MARGIN_X, MARGIN_Y, PADDING, ROWS,
-                              computational_vision, get_cells, get_zone_region)
+from utils.algorithms import (MARGIN_X, MARGIN_Y, PADDING,
+                              computational_vision, get_cells, get_zone_region,
+                              get_crop_coordinates)
 
 MODELS = {
     "region_detection": {
@@ -66,7 +67,7 @@ if __name__ == "__main__":
     logger.debug("Evaluation time (1-image): {:.3f}s".format(end - start))
     if verbosity > 2:
         cv2.imshow("Window", image)
-        cv2.waitKey(0)
+        cv2.waitKey(1)
         cv2.imwrite("results/vote.png", image)
 
     logger.info("Getting Zone Region")
@@ -76,28 +77,27 @@ if __name__ == "__main__":
     logger.debug("Evaluation time (1-image): {:.3f}s".format(end - start))
     if verbosity > 2:
         cv2.imshow("Window", vote_region)
-        cv2.waitKey(0)
+        cv2.waitKey(1)
         cv2.imwrite("results/vote_region.png", vote_region)
 
     logger.info("Segmenting Zone Region")
+
+    points = get_crop_coordinates(vote_region)
     if verbosity > 2:
         clone = vote_region.copy()
-        step_size_x = int(clone.shape[1] / COLUMNS)
-        step_size_y = int(clone.shape[0] / ROWS)
-        for y in range(MARGIN_Y, clone.shape[0], step_size_y):
-            for x in range(MARGIN_X, clone.shape[1], step_size_x):
-                cv2.rectangle(clone,
-                              (x - PADDING, y - PADDING),
-                              (x + step_size_x + PADDING,
-                               y + step_size_y + PADDING),
+        for (x, y, step_size_x, step_size_y) in points:
+            cv2.rectangle(clone,
+                              (x, y),
+                              (x + step_size_x,
+                               y + step_size_y),
                               (0, 255, 0),
                               2)
         cv2.imshow("Window", clone)
-        cv2.waitKey(0)
+        cv2.waitKey(1)
         cv2.imwrite("results/vote_region_segmented.png", clone)
 
     logger.info("Character Classification")
-    for (cell) in get_cells(vote_region):
+    for (cell) in get_cells(vote_region, points):
         start = time.time()
         result = computational_vision(cell)
         end = time.time()
