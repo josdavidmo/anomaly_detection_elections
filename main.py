@@ -2,6 +2,7 @@ import argparse
 import logging
 import multiprocessing
 import time
+import uuid
 
 import cv2
 import imutils
@@ -9,27 +10,15 @@ import numpy as np
 import verboselogs
 from pdf2image import convert_from_path
 
-from utils.algorithms import (MARGIN_X, MARGIN_Y, PADDING,
-                              computational_vision, get_cells, get_zone_region,
-                              get_crop_coordinates)
+from utils.algorithms import (MARGIN_X, MARGIN_Y, PADDING, WIN_H, WIN_W,
+                              computational_vision, get_cells,
+                              get_crop_coordinates, get_zone_region)
 
 MODELS = {
-    "region_detection": {
-        "model": "models/region_detection.pb",
-        "labels": "models/region_detection_labels.txt"
-    },
-    "character_detection": {
-        "model": "models/character_detection.pb",
-        "labels": "models/character_detection_labels.txt"
-    },
     "character_classification": {
-        "model": "models/character_classification.pb",
-        "labels": "models/character_classification_labels.txt"
-    },
-    "character_segmentation": {
-        "model": "models/character_segmentation.pb",
-        "labels": "models/character_segmentation_labels.txt"
-    },
+        "model": "models/v2/character_classification.pb",
+        "labels": "models/v2/character_classification_labels.txt"
+    }
 }
 
 logger = verboselogs.VerboseLogger(__name__)
@@ -99,7 +88,11 @@ if __name__ == "__main__":
     logger.info("Character Classification")
     for (cell) in get_cells(vote_region, points):
         start = time.time()
+        cell = cv2.resize(cell, (WIN_W,WIN_H), interpolation = cv2.INTER_AREA)
         result = computational_vision(cell)
+
+        #cv2.imwrite("/home/josdavidmo/Projects/character_classification_model/tf_files/character_clasification/%s/%s.png"
+        #            % (result,str(uuid.uuid4())), cell)
         end = time.time()
         logger.info("Result: {}".format(result))
         logger.debug("Evaluation time (1-image): {:.3f}s".format(end - start))

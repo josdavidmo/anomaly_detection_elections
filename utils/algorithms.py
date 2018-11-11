@@ -25,8 +25,8 @@ OUTPUT_LAYER = "final_result"
 TITLE_PATH = 'utils/0b0854bc-24b2-4a4a-8371-ae3aa1ab358a.png'
 CUBIC_PATH = 'utils/1b318ef1-bdbd-47b0-8bef-c274b7f89b5b.png'
 CORNERS_PATH = 'utils/corners.png'
-PATH_MODEL = "models/character_classification.pb"
-PATH_LABELS = "models/character_classification_labels.txt"
+PATH_MODEL = "models/v3/character_classification.pb"
+PATH_LABELS = "models/v3/character_classification_labels.txt"
 ROWS_CANDIDATES = 8
 ROWS_TOTALS = 4
 COLUMNS = 3
@@ -115,4 +115,4 @@ def computational_vision(image, win_w=WIN_W, win_h=WIN_H):
                            {input_operation.outputs[0]: t})
     results = np.squeeze(results)
     top_k = results.argsort()[-1:][::-1]
-    return labels[top_k[0]]
+    return labels[top_k[0]], results[top_k[0]]
