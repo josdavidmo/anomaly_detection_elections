@@ -1,6 +1,5 @@
 from __future__ import absolute_import
 
-import multiprocessing
 from operator import itemgetter
 
 import cv2
@@ -22,8 +21,8 @@ SCALE = 5
 THRESHOLD = .8
 INPUT_LAYER = "input"
 OUTPUT_LAYER = "final_result"
-TITLE_PATH = 'utils/0b0854bc-24b2-4a4a-8371-ae3aa1ab358a.png'
-CUBIC_PATH = 'utils/1b318ef1-bdbd-47b0-8bef-c274b7f89b5b.png'
+TITLE_PATH = 'resources/0b0854bc-24b2-4a4a-8371-ae3aa1ab358a.png'
+CUBIC_PATH = 'resources/1b318ef1-bdbd-47b0-8bef-c274b7f89b5b.png'
 CORNERS_PATH = 'utils/corners.png'
 PATH_MODEL = "models/v3/character_classification.pb"
 PATH_LABELS = "models/v3/character_classification_labels.txt"
@@ -41,7 +40,8 @@ def get_crop_coordinates(vote_region):
     res_corners = cv2.matchTemplate(vote_region, corners, cv2.TM_CCOEFF_NORMED)
     loc_corners = next(zip(*np.where(res_corners >= THRESHOLD)[::-1]))
     (loc_corners_x, loc_corners_y) = (int(loc_corners[0] +
-                                          w_corners / 2), int(loc_corners[1] + h_corners / 2))
+                                          w_corners / 2),
+                                      int(loc_corners[1] + h_corners / 2))
 
     points = []
 
@@ -82,20 +82,20 @@ def get_zone_region(image):
     res_cubic = cv2.matchTemplate(image_copy, cubic, cv2.TM_CCOEFF_NORMED)
     loc_title = next(zip(*np.where(res_title >= THRESHOLD)[::-1]))
     loc_cubic_y = max(zip(*np.where(res_cubic >= THRESHOLD)
-                          [::-1]), key=itemgetter(1))[1]
+    [::-1]), key=itemgetter(1))[1]
     loc_cubic_x = max(zip(*np.where(res_cubic >= THRESHOLD)
-                          [::-1]), key=itemgetter(0))[0]
+    [::-1]), key=itemgetter(0))[0]
     return image[(loc_title[1] + h_title) * SCALE:(loc_cubic_y - 8) * SCALE,
-                 loc_title[0] * SCALE:(loc_cubic_x + w_cubic) * SCALE, :]
+           loc_title[0] * SCALE:(loc_cubic_x + w_cubic) * SCALE, :]
 
 
 def get_cells(votation_region, points):
     for (x, y, step_size_x, step_size_y) in points:
         yield (votation_region[y:y + step_size_y,
-                               x:x + step_size_x])
+               x:x + step_size_x])
 
 
-def computational_vision(image, win_w=WIN_W, win_h=WIN_H):
+def computational_vision(image):
     graph = load_graph(PATH_MODEL)
     labels = load_labels(PATH_LABELS)
     window = imutils.resize(image, width=WIN_W, height=WIN_H)

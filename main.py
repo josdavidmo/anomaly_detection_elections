@@ -2,17 +2,14 @@ import argparse
 import logging
 import multiprocessing
 import time
-import uuid
 
 import cv2
-import imutils
 import numpy as np
-import verboselogs
 from pdf2image import convert_from_path
+import verboselogs
 
-from utils.algorithms import (MARGIN_X, MARGIN_Y, PADDING, WIN_H, WIN_W,
-                              computational_vision, get_cells,
-                              get_crop_coordinates, get_zone_region)
+from utils.algorithms import get_zone_region, get_crop_coordinates, get_cells, \
+    WIN_W, WIN_H, computational_vision
 
 logger = verboselogs.VerboseLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -36,25 +33,27 @@ LABELS = CANDIDATES + TOTAL_LABELS
 if __name__ == "__main__":
     workers = multiprocessing.cpu_count() + 1
     ap = argparse.ArgumentParser()
-    ap.add_argument("-i", "--image", required=True, help="Path to the image")
+    ap.add_argument("-i", "--image",
+                    default='/home/josdavidmo/Proyectos/anomaly_detection_elections/data/forms/01/001/01/01/Mesa 001.pdf',
+                    help="Path to the image")
     ap.add_argument("-w", "--workers",
                     default=workers, help="Number of workers")
     ap.add_argument("-v", "--verbosity",
-                    default=2, help="Configure logger for requested verbosity")
+                    default=1, help="Configure logger for requested verbosity")
+    ap.add_argument("-m", "--mode", default='client', help="")
+    ap.add_argument("-p", "--port", default=39995, help="")
     args = vars(ap.parse_args())
     verbosity = int(args["verbosity"])
 
     # Configure logger for requested verbosity.
-    if verbosity >= 4:
-        logger.setLevel(logging.SPAM)
-    elif verbosity >= 3:
+    if verbosity >= 3:
         logger.setLevel(logging.DEBUG)
     elif verbosity >= 2:
-        logger.setLevel(logging.VERBOSE)
-    elif verbosity >= 1:
-        logger.setLevel(logging.INFO)
-    elif verbosity < 0:
         logger.setLevel(logging.WARNING)
+    elif verbosity >= 1:
+        logger.setLevel(logging.CRITICAL)
+        logger.setLevel(logging.ERROR)
+        logger.setLevel(logging.INFO)
 
     logger.info("Transforming PDF to Image")
     start = time.time()
@@ -62,65 +61,65 @@ if __name__ == "__main__":
     image = convert_from_path(args["image"])[0].convert('RGB')
     image = np.array(image)
     end = time.time()
-    logger.debug("Evaluation time : {:.3f}s".format(end - start))
-    if verbosity > 2:
+    logger.info("Evaluation time : {:.3f}s".format(end - start))
+    if verbosity >= 3:
         cv2.imshow("Window", image)
-        cv2.waitKey(1)
-        cv2.imwrite("results/vote.png", image)
+        cv2.waitKey(0)
+    cv2.imwrite("results/vote.png", image)
 
     logger.info("Getting Zone Region")
     start = time.time()
     vote_region = get_zone_region(image)
     end = time.time()
-    logger.debug("Evaluation time : {:.3f}s".format(end - start))
-    if verbosity > 2:
+    logger.info("Evaluation time : {:.3f}s".format(end - start))
+    if verbosity >= 3:
         cv2.imshow("Window", vote_region)
-        cv2.waitKey(1)
-        cv2.imwrite("results/vote_region.png", vote_region)
+        cv2.waitKey(0)
+    cv2.imwrite("results/vote_region.png", vote_region)
 
     logger.info("Segmenting Zone Region")
-
+    start = time.time()
     points = get_crop_coordinates(vote_region)
-    if verbosity > 2:
-        clone = vote_region.copy()
-        for (x, y, step_size_x, step_size_y) in points:
-            cv2.rectangle(clone,
-                          (x, y),
-                          (x + step_size_x,
-                           y + step_size_y),
-                          (0, 255, 0),
-                          2)
+    end = time.time()
+    logger.info("Evaluation time : {:.3f}s".format(end - start))
+    clone = vote_region.copy()
+    for (x, y, step_size_x, step_size_y) in points:
+        cv2.rectangle(clone,
+                      (x, y),
+                      (x + step_size_x,
+                       y + step_size_y),
+                      (0, 255, 0),
+                      2)
+    if verbosity >= 3:
         cv2.imshow("Window", clone)
-        cv2.waitKey(1)
-        cv2.imwrite("results/vote_region_segmented.png", clone)
+        cv2.waitKey(0)
+    cv2.imwrite("results/vote_region_segmented.png", clone)
 
     logger.info("Character Classification")
     results = []
     candidate_result = ""
-    for (i, cell) in enumerate(get_cells(vote_region, points)):
-        start = time.time()
+    for (i, cell) in enumerate(get_cells(vote_region, points), start=1):
         cell = cv2.resize(cell, (WIN_W, WIN_H), interpolation=cv2.INTER_AREA)
         try:
+            start = time.time()
             result = computational_vision(cell)
-            if i % 3 == 0 and i != 0:
+            end = time.time()
+            logger.info("Value : {}".format(result[0]))
+            logger.info("Evaluation time: {:.3f}s".format(end - start))
+            if result[0] not in ('dash', 'slash', 'white'):
+                candidate_result += result[0]
+            if i % 3 == 0:
                 number_votes = 0
                 if candidate_result != '':
                     number_votes = int(candidate_result)
                 results.append(number_votes)
-                candidate_result = result[0] if result[0] not in \
-                    ('dash', 'slash', 'white') else ''
-            else:
-                if result[0] not in ('dash', 'slash'):
-                    candidate_result += result[0]
+                candidate_result = ''
+            if verbosity >= 3:
+                cv2.imshow("Result: {}".format(result), cell)
+                cv2.waitKey(0)
+            cv2.imwrite("results/{}_{}.png".format(i, result[0]), cell)
         except ValueError as e:
             logger.error(e)
-        end = time.time()
-        logger.debug("Value : {}".format(result))
-        logger.debug("Evaluation time : {:.3f}s".format(end - start))
-        if verbosity > 2:
-            cv2.imshow("Result: {}".format(result), cell)
-            cv2.waitKey(0)
-    results.append(int(candidate_result) if candidate_result != '' else 0)
     logger.info("--------------------------------------------------")
     for i, result in enumerate(results):
         logger.info("{0:40} {1:3d}".format(LABELS[i], results[i]))
