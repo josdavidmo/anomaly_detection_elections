@@ -5,15 +5,14 @@ grpcio==1.20.1
 h5py==2.9.0
 imutils==0.5.2
 isort==4.3.17
-Keras-Applications==1.0.6
-Keras-Preprocessing==1.0.5
 Markdown==3.1
 mock==2.0.0
 numpy==1.16.3
+opencv-contrib-python==4.1.0.25
+opencv-python==4.1.0.25
 pbr==5.2.0
 pdf2image==1.5.4
 Pillow==6.0.0
-pkg-resources==0.0.0
 protobuf==3.7.1
 six==1.12.0
 tensorboard==1.13.1
