@@ -6,6 +6,7 @@ import cv2
 import imutils
 import numpy as np
 import tensorflow as tf
+from math import isclose
 
 from utils.tensorflow import load_graph, load_labels, read_tensor_from_image
 
@@ -23,9 +24,15 @@ INPUT_LAYER = "input"
 OUTPUT_LAYER = "final_result"
 TITLE_PATH = 'resources/0b0854bc-24b2-4a4a-8371-ae3aa1ab358a.png'
 CUBIC_PATH = 'resources/1b318ef1-bdbd-47b0-8bef-c274b7f89b5b.png'
-CORNERS_PATH = 'utils/corners.png'
+CORNERS_PATH = 'resources/corners.png'
+X_PATH = 'resources/x.png'
 PATH_MODEL = "models/v3/character_classification.pb"
 PATH_LABELS = "models/v3/character_classification_labels.txt"
+MASK_LOWER_LIMIT = np.array([0, 0, 0])
+MASK_UPPER_LIMIT = np.array([40, 40, 40])
+HIGH_VOTE_REGION = 2000
+WIDTH_VOTE_REGION = 423
+TOLERANCE_FIND_EDGES = 0.25
 ROWS_CANDIDATES = 8
 ROWS_TOTALS = 4
 COLUMNS = 3
@@ -63,30 +70,40 @@ def get_crop_coordinates(vote_region):
 
 
 def get_zone_region(image):
-    w_image = int(image.shape[1] / SCALE)
-    h_image = int(image.shape[0] / SCALE)
-    image_copy = imutils.resize(image, width=w_image, height=h_image)
-
-    title = cv2.imread(TITLE_PATH)
-    w = int(title.shape[1] / SCALE)
-    title = imutils.resize(title, width=w)
-
-    cubic = cv2.imread(CUBIC_PATH)
-    w = int(cubic.shape[1] / SCALE)
-    cubic = imutils.resize(cubic, width=w)
-
-    w_title, h_title = title.shape[:-1]
-    w_cubic, h_cubic = cubic.shape[:-1]
-
-    res_title = cv2.matchTemplate(image_copy, title, cv2.TM_CCOEFF_NORMED)
-    res_cubic = cv2.matchTemplate(image_copy, cubic, cv2.TM_CCOEFF_NORMED)
-    loc_title = next(zip(*np.where(res_title >= THRESHOLD)[::-1]))
-    loc_cubic_y = max(zip(*np.where(res_cubic >= THRESHOLD)
-    [::-1]), key=itemgetter(1))[1]
-    loc_cubic_x = max(zip(*np.where(res_cubic >= THRESHOLD)
-    [::-1]), key=itemgetter(0))[0]
-    return image[(loc_title[1] + h_title) * SCALE:(loc_cubic_y - 8) * SCALE,
-           loc_title[0] * SCALE:(loc_cubic_x + w_cubic) * SCALE, :]
+    rotated = straighten_image(image)
+    template = cv2.imread(X_PATH, 0)
+    w, h = template.shape[::-1]
+    res = cv2.matchTemplate(rotated, template, cv2.TM_CCOEFF_NORMED)
+    # Store the coordinates of matched area in a numpy array
+    loc = np.where(res >= THRESHOLD)
+    max_y = np.amax(loc[0])
+    max_x = np.amax(loc[1])
+    crop_img = rotated[max_y:max_y + rotated.shape[0], max_x:max_x + rotated.shape[1]]
+    x_region = rotated[max_y:max_y + h, max_x:max_x + rotated.shape[1]]
+    shape_mask = cv2.inRange(x_region, MASK_LOWER_LIMIT, MASK_UPPER_LIMIT)
+    # find the contours in the mask
+    cnts = cv2.findContours(shape_mask.copy(), cv2.RETR_EXTERNAL,
+                            cv2.CHAIN_APPROX_SIMPLE)
+    cnts = imutils.grab_contours(cnts)
+    cnts = list(filter(lambda x: len(cv2.approxPolyDP(x, TOLERANCE_FIND_EDGES * cv2.arcLength(x, True), True)) == 4,
+                       cnts))
+    min_y_coordinate = min(min(list(([b for [[a, b]] in c] for c in cnts))))
+    cnts = list(filter(lambda x: min(b for [[a, b]] in x) == min_y_coordinate, cnts))
+    square_high = max((b for [[a, b]] in cnts[0])) - min((b for [[a, b]] in cnts[0]))
+    square_min = [max((a for [[a, b]] in cnts[0])), max((b for [[a, b]] in cnts[0]))]
+    crop_y_from = min((a for [[a, b]] in cnts[0]))
+    column = crop_img[:, crop_y_from:cnts[0].max()]
+    shape_mask = cv2.inRange(column, MASK_LOWER_LIMIT, MASK_UPPER_LIMIT)
+    cnts = cv2.findContours(shape_mask.copy(), cv2.RETR_EXTERNAL,
+                            cv2.CHAIN_APPROX_SIMPLE)
+    cnts = imutils.grab_contours(cnts)
+    # loop over the contours
+    cnts = list(filter(lambda x: len(cv2.approxPolyDP(x, 0.02 * cv2.arcLength(x, True), True)) == 4
+                       and isclose(square_min[0], max((a for [[a, b]] in x)) + crop_y_from, rel_tol=0.1)
+                       and isclose(square_high, max((b for [[a, b]] in x)) - min((b for [[a, b]] in x)),
+                       rel_tol=0.1), cnts))
+    square_max = [max((a for [[a, b]] in cnts[0])), max((b for [[a, b]] in cnts[0]))]
+    return cv2.resize(crop_img[0:square_max[1], 0:square_min[0]], (int(WIDTH_VOTE_REGION), int(HIGH_VOTE_REGION)))
 
 
 def get_cells(votation_region, points):
@@ -116,3 +133,43 @@ def computational_vision(image):
     results = np.squeeze(results)
     top_k = results.argsort()[-1:][::-1]
     return labels[top_k[0]], results[top_k[0]]
+
+
+def straighten_image(image):
+    # convert the image to grayscale and flip the foreground
+    # and background to ensure foreground is now "white" and
+    # the background is "black"
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    gray = cv2.bitwise_not(gray)
+
+    # threshold the image, setting all foreground pixels to
+    # 255 and all background pixels to 0
+    thresh = cv2.threshold(gray, 0, 255,
+                           cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+
+    # grab the (x, y) coordinates of all pixel values that
+    # are greater than zero, then use these coordinates to
+    # compute a rotated bounding box that contains all
+    # coordinates
+    coords = np.column_stack(np.where(thresh > 0))
+    angle = cv2.minAreaRect(coords)[-1]
+
+    # the `cv2.minAreaRect` function returns values in the
+    # range [-90, 0); as the rectangle rotates clockwise the
+    # returned angle trends to 0 -- in this special case we
+    # need to add 90 degrees to the angle
+    if angle < -45:
+        angle = -(90 + angle)
+
+    # otherwise, just take the inverse of the angle to make
+    # it positive
+    else:
+        angle = -angle
+
+    # rotate the image to deskew it
+    (h, w) = image.shape[:2]
+    center = (w // 2, h // 2)
+    M = cv2.getRotationMatrix2D(center, angle, 1.0)
+    rotated = cv2.warpAffine(image, M, (w, h),
+                             flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+    return rotated
