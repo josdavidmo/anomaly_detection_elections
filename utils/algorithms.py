@@ -32,7 +32,7 @@ MASK_LOWER_LIMIT = np.array([0, 0, 0])
 MASK_UPPER_LIMIT = np.array([40, 40, 40])
 HIGH_VOTE_REGION = 2000
 WIDTH_VOTE_REGION = 423
-TOLERANCE_FIND_EDGES = 0.25
+TOLERANCE_FIND_EDGES = 0.1
 ROWS_CANDIDATES = 8
 ROWS_TOTALS = 4
 COLUMNS = 3
@@ -71,9 +71,10 @@ def get_crop_coordinates(vote_region):
 
 def get_zone_region(image):
     rotated = straighten_image(image)
+    gray = cv2.cvtColor(rotated, cv2.COLOR_BGR2GRAY)
     template = cv2.imread(X_PATH, 0)
     w, h = template.shape[::-1]
-    res = cv2.matchTemplate(rotated, template, cv2.TM_CCOEFF_NORMED)
+    res = cv2.matchTemplate(gray, template, cv2.TM_CCOEFF_NORMED)
     # Store the coordinates of matched area in a numpy array
     loc = np.where(res >= THRESHOLD)
     max_y = np.amax(loc[0])
