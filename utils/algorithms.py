@@ -1,12 +1,11 @@
 from __future__ import absolute_import
 
-from operator import itemgetter
+from math import isclose
 
 import cv2
 import imutils
 import numpy as np
 import tensorflow as tf
-from math import isclose
 
 from utils.tensorflow import load_graph, load_labels, read_tensor_from_image
 
@@ -40,32 +39,24 @@ COLUMNS = 3
 MARGIN_X = 25
 MARGIN_Y = 45
 PADDING = 6
+VOTE_REGION_MARGIN_X = 55
+VOTE_REGION_MARGIN_Y = 500
+H_CANDIDATE = 125
+H_TOTAL = 105
 
 
 def get_crop_coordinates(vote_region):
-    corners = cv2.imread(CORNERS_PATH)
-    w_corners, h_corners = corners.shape[:-1]
-    res_corners = cv2.matchTemplate(vote_region, corners, cv2.TM_CCOEFF_NORMED)
-    loc_corners = next(zip(*np.where(res_corners >= THRESHOLD)[::-1]))
-    (loc_corners_x, loc_corners_y) = (int(loc_corners[0] +
-                                          w_corners / 2),
-                                      int(loc_corners[1] + h_corners / 2))
-
     points = []
 
     step_size_x = int(vote_region.shape[1] / COLUMNS)
-    step_size_y = int(loc_corners_y / ROWS_CANDIDATES)
 
-    for y in range(MARGIN_Y, loc_corners_y, step_size_y):
-        for x in range(MARGIN_X, vote_region.shape[1], step_size_x):
-            points.append((x, y, step_size_x, step_size_y))
-
-    step_size_y = int(
-        (vote_region.shape[0] - MARGIN_Y - loc_corners_y) / ROWS_TOTALS)
-
-    for y in range(loc_corners_y + MARGIN_Y, vote_region.shape[0], step_size_y):
-        for x in range(MARGIN_X, vote_region.shape[1], step_size_x):
-            points.append((x, y, step_size_x, step_size_y))
+    for y in range(0, H_CANDIDATE * ROWS_CANDIDATES, H_CANDIDATE):
+        for x in range(0, vote_region.shape[1], step_size_x):
+            points.append((x, y, step_size_x, H_CANDIDATE))
+    start = H_CANDIDATE * ROWS_CANDIDATES
+    for y in range(start, vote_region.shape[0], H_TOTAL):
+        for x in range(0, vote_region.shape[1], step_size_x):
+            points.append((x, y, step_size_x, H_TOTAL))
 
     return points
 
@@ -83,7 +74,8 @@ def get_zone_region(image):
     loc = np.where(res >= THRESHOLD)
     max_y = np.amax(loc[0])
     max_x = np.amax(loc[1])
-    crop_img = rotated[max_y:max_y + rotated.shape[0], max_x:max_x + rotated.shape[1]]
+    crop_img = rotated[max_y:max_y + rotated.shape[0],
+               max_x:max_x + rotated.shape[1]]
     x_region = rotated[max_y:max_y + h, max_x:max_x + rotated.shape[1]]
     cv2.imshow("x_region", x_region)
     cv2.waitKey(0)
@@ -102,9 +94,12 @@ def get_zone_region(image):
     cv2.imshow("x_region", x_region)
     cv2.waitKey(0)
     min_y_coordinate = min(min(list(([b for [[a, b]] in c] for c in cnts))))
-    cnts = list(filter(lambda x: min(b for [[a, b]] in x) == min_y_coordinate, cnts))
-    square_high = max((b for [[a, b]] in cnts[0])) - min((b for [[a, b]] in cnts[0]))
-    square_min = [max((a for [[a, b]] in cnts[0])), max((b for [[a, b]] in cnts[0]))]
+    cnts = list(
+        filter(lambda x: min(b for [[a, b]] in x) == min_y_coordinate, cnts))
+    square_high = max((b for [[a, b]] in cnts[0])) - min(
+        (b for [[a, b]] in cnts[0]))
+    square_min = [max((a for [[a, b]] in cnts[0])),
+                  max((b for [[a, b]] in cnts[0]))]
     crop_y_from = min((a for [[a, b]] in cnts[0]))
     column = crop_img[:, crop_y_from:cnts[0].max()]
     cv2.imshow("column", column)
@@ -114,13 +109,23 @@ def get_zone_region(image):
                             cv2.CHAIN_APPROX_SIMPLE)
     cnts = imutils.grab_contours(cnts)
     # loop over the contours
-    cnts = list(filter(lambda x: len(cv2.approxPolyDP(x, 0.02 * cv2.arcLength(x, True), True)) == 4
-                       and isclose(square_min[0], max((a for [[a, b]] in x)) + crop_y_from, rel_tol=0.1)
-                       and isclose(square_high, max((b for [[a, b]] in x)) - min((b for [[a, b]] in x)),
-                       rel_tol=0.1), cnts))
-    square_max = [max((a for [[a, b]] in cnts[0])), max((b for [[a, b]] in cnts[0]))]
-    # return crop_img[0:square_max[1], 0:square_min[0]]
-    return cv2.resize(crop_img[0:square_max[1], 0:square_min[0]], (int(WIDTH_VOTE_REGION), int(HIGH_VOTE_REGION)))
+    cnts = list(filter(lambda x: len(
+        cv2.approxPolyDP(x, 0.02 * cv2.arcLength(x, True), True)) == 4
+                                 and isclose(square_min[0], max(
+        (a for [[a, b]] in x)) + crop_y_from, rel_tol=0.1)
+                                 and isclose(square_high,
+                                             max((b for [[a, b]] in x)) - min(
+                                                 (b for [[a, b]] in x)),
+                                             rel_tol=0.1), cnts))
+    square_max = [max((a for [[a, b]] in cnts[0])),
+                  max((b for [[a, b]] in cnts[0]))]
+    vote_region = cv2.resize(crop_img[0:square_max[1], 0:square_min[0]],
+                             (int(WIDTH_VOTE_REGION), int(HIGH_VOTE_REGION)))
+    vote_region = vote_region[VOTE_REGION_MARGIN_Y:HIGH_VOTE_REGION - 50,
+                  VOTE_REGION_MARGIN_X:]
+    h_vote_region = H_CANDIDATE * ROWS_CANDIDATES + H_TOTAL * ROWS_TOTALS
+    w_vote_region = int(vote_region.shape[1] / COLUMNS) * COLUMNS
+    return vote_region[:h_vote_region, :w_vote_region]
 
 
 def get_contours(cnts, cnts_number):
@@ -202,5 +207,6 @@ def straighten_image(image):
     center = (w // 2, h // 2)
     M = cv2.getRotationMatrix2D(center, angle, 1.0)
     rotated = cv2.warpAffine(image, M, (w, h),
-                             flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+                             flags=cv2.INTER_CUBIC,
+                             borderMode=cv2.BORDER_REPLICATE)
     return rotated
