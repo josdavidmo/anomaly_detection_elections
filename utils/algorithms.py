@@ -29,6 +29,7 @@ PATH_MODEL = "models/v3/character_classification.pb"
 PATH_LABELS = "models/v3/character_classification_labels.txt"
 MASK_LOWER_LIMIT = np.array([0, 0, 0])
 MASK_UPPER_LIMIT = np.array([40, 40, 40])
+HIGH_PAGE = 6181
 HIGH_VOTE_REGION = 2000
 WIDTH_VOTE_REGION = 423
 TOLERANCE_FIND_EDGES = 0.1
@@ -61,7 +62,10 @@ def get_crop_coordinates(vote_region):
 
 
 def get_zone_region(image):
+
     rotated = straighten_image(image)
+    rotated = cv2.resize(rotated, (2434, 6181))
+    cv2.imwrite("resizeandrotated.png", rotated)
     gray = cv2.cvtColor(rotated, cv2.COLOR_BGR2GRAY)
     template = cv2.imread(X_PATH, 0)
     w, h = template.shape[::-1]
@@ -73,15 +77,22 @@ def get_zone_region(image):
     crop_img = rotated[max_y:max_y + rotated.shape[0],
                max_x:max_x + rotated.shape[1]]
     x_region = rotated[max_y:max_y + h, max_x:max_x + rotated.shape[1]]
+    cv2.imshow("x_region", x_region)
+    cv2.waitKey(0)
     shape_mask = cv2.inRange(x_region, MASK_LOWER_LIMIT, MASK_UPPER_LIMIT)
     # find the contours in the mask
     cnts = cv2.findContours(shape_mask.copy(), cv2.RETR_EXTERNAL,
                             cv2.CHAIN_APPROX_SIMPLE)
     cnts = imutils.grab_contours(cnts)
-    cnts = list(filter(lambda x: len(
-        cv2.approxPolyDP(x, TOLERANCE_FIND_EDGES * cv2.arcLength(x, True),
-                         True)) == 4,
-                       cnts))
+    cnts_metric = list(
+        filter(lambda x: len(cv2.approxPolyDP(x, TOLERANCE_FIND_EDGES * cv2.arcLength(x, True), True)) == 4,
+               cnts))
+    cnts = get_contours(cnts, cnts_metric)
+    print("DEFINITIVA", len(cnts))
+    for c in cnts:
+        cv2.drawContours(x_region, [c], 0, (0, 0, 255), -1)
+    cv2.imshow("x_region", x_region)
+    cv2.waitKey(0)
     min_y_coordinate = min(min(list(([b for [[a, b]] in c] for c in cnts))))
     cnts = list(
         filter(lambda x: min(b for [[a, b]] in x) == min_y_coordinate, cnts))
@@ -91,6 +102,8 @@ def get_zone_region(image):
                   max((b for [[a, b]] in cnts[0]))]
     crop_y_from = min((a for [[a, b]] in cnts[0]))
     column = crop_img[:, crop_y_from:cnts[0].max()]
+    cv2.imshow("column", column)
+    cv2.waitKey(0)
     shape_mask = cv2.inRange(column, MASK_LOWER_LIMIT, MASK_UPPER_LIMIT)
     cnts = cv2.findContours(shape_mask.copy(), cv2.RETR_EXTERNAL,
                             cv2.CHAIN_APPROX_SIMPLE)
@@ -113,6 +126,20 @@ def get_zone_region(image):
     h_vote_region = H_CANDIDATE * ROWS_CANDIDATES + H_TOTAL * ROWS_TOTALS
     w_vote_region = int(vote_region.shape[1] / COLUMNS) * COLUMNS
     return vote_region[:h_vote_region, :w_vote_region]
+
+
+def get_contours(cnts, cnts_number):
+    last_tolerance = TOLERANCE_FIND_EDGES
+    while not len(cnts_number) == 1:
+        if len(cnts_number) > 1:
+            last_tolerance += 0.02
+        else:
+            last_tolerance -= 0.02
+        cnts_number = list(
+            filter(lambda x: len(cv2.approxPolyDP(x, last_tolerance * cv2.arcLength(x, True), True)) == 4,
+                   cnts))
+    return cnts_number
+
 
 
 def get_cells(votation_region, points):
