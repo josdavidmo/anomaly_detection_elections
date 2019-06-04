@@ -4,8 +4,7 @@ data/
 data/*
 
 # Ignore Train Data
-test_data/
-test_data/*
+tf_files
 
 # Ignore Virtual Env
 anomaly_detection_elections_env/
