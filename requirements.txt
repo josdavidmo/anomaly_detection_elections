@@ -8,7 +8,7 @@ isort==4.3.17
 Markdown==3.1
 mock==2.0.0
 numpy==1.16.3
-opencv-contrib-python==4.1.0.25
+opencv-contrib-python==4.1.1.26
 opencv-python==4.1.0.25
 pbr==5.2.0
 pdf2image==1.5.4
